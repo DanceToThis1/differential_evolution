@@ -1,0 +1,8 @@
+[project]
+name = "de-lab"
+version = "0.1.0"
+description = "A differential evolution learning project"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+]
