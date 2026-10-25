@@ -1,7 +1,8 @@
 # de-lab
 
 用于学习和实验的差分进化（Differential Evolution）项目，要求 Python 3.11 或更高版本。
-目前实现了基础 DE：rand/1 变异、二项交叉、与边界取中点的越界修复和贪心选择。
+目前实现了基础 DE 和个体参数自适应的 jDE：共享 rand/1 变异、二项交叉、
+与边界取中点的越界修复和贪心选择。
 目标函数按最小化处理，每次接收一个一维 NumPy 数组，返回一个实数。
 
 ## 安装
@@ -47,6 +48,30 @@ print(result.best_x, result.best_f, result.nfev)
 `for info in optimizer.iterate(): ...`；它也会产出初始化后的第 0 代。
 每次重新运行实验应创建新的优化器实例，同一个实例只能启动一次运行。
 
+## jDE：每个个体保存自己的参数
+
+```python
+from delab import JDE
+
+optimizer = JDE(sphere, bounds=[(-5, 5), (-5, 5)], popsize=30, max_nfev=5000, seed=42)
+result = optimizer.run()
+print(result.best_f)
+print(optimizer.F_i, optimizer.CR_i)
+```
+
+这里的 `sphere` 沿用上面的目标函数。`JDE` 继承 `DE`，构造参数和验证规则相同，
+其中 `F`、`CR` 指定每个个体的初始参数，默认分别为 0.5、0.9。
+已保存的个体参数放在长度为 `popsize` 的 `F_i`、`CR_i` 数组里。
+
+每代分别以 0.1 的概率为每个个体重新采样候选 `F`、`CR`，否则继承其已保存的值。
+新的 `F` 均匀采样自 `[0.1, 1.0)`，新的 `CR` 均匀采样自 `[0, 1)`。
+这些固定概率和采样范围采用 [Brest 等人的 jDE 论文](https://doi.org/10.1109/TEVC.2006.872133)
+中的设置，区间写法遵循 NumPy 随机采样不含上端点的约定。
+
+`generate_params()` 在副本上生成候选参数，试验个体通过选择后，
+`adapt()` 才把对应候选写回。两种优化器都采用严格改进规则：
+`trial_fitness < fitness` 才替换个体；相等时保留原个体，jDE 也保留其原参数。
+
 ## 参数约定
 
 | 参数 | 要求 |
@@ -78,7 +103,8 @@ python -m ruff format --check .
 ```
 
 pytest 从 `tests/` 收集测试。现有测试覆盖 Sphere 收敛、seed 可复现、越界修复、
-评估点合法性、构造参数检查和评估预算。只运行参数检查测试：
+评估点合法性、构造参数检查、评估预算以及 jDE 的候选参数和成功保留规则。
+只运行参数检查测试：
 
 ```bash
 python -m pytest tests/test_validation.py -v
@@ -100,4 +126,4 @@ Ruff 检查常见代码错误和导入顺序；`python -m ruff format .` 自动�
 - `[tool.pytest.ini_options]` 指定测试目录。
 - `[tool.ruff]` 和 `[tool.ruff.lint]` 配置格式和检查规则。
 
-`src/delab/__init__.py` 显式定义包，并导出 `DE`、`Optimizer` 和 `GenerationInfo`。
+`src/delab/__init__.py` 显式定义包，并导出 `DE`、`JDE`、`Optimizer` 和 `GenerationInfo`。

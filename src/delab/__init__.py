@@ -2,5 +2,6 @@
 
 from .base import GenerationInfo, Optimizer
 from .de import DE
+from .jde import JDE
 
-__all__ = ["DE", "GenerationInfo", "Optimizer"]
+__all__ = ["DE", "JDE", "GenerationInfo", "Optimizer"]
