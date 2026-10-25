@@ -1,7 +1,10 @@
 .DS_Store
 *.egg-info/
 __pycache__/
-
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
 *.pyc
 .venv
 venv/
