@@ -1,45 +1,80 @@
 from abc import ABC, abstractmethod
-import numpy as np
 from dataclasses import dataclass
+from numbers import Integral
+
+import numpy as np
+
 
 @dataclass
 class GenerationInfo:
     """每一代结束后产出的信息，用于画图和分析。"""
+
     generation: int
-    nfev: int              # 到目前为止的函数评估次数
+    nfev: int  # 到目前为止的函数评估次数
     best_x: np.ndarray
     best_f: float
-    extra: dict            # 子类想额外记录的东西，比如 JADE 的 mean_F、mean_CR
+    extra: dict  # 子类想额外记录的东西，比如 JADE 的 mean_F、mean_CR
+
 
 class Optimizer(ABC):
-
     def __init__(self, func, bounds, popsize=50, max_nfev=100_000, seed=None):
+        if not callable(func):
+            raise TypeError("func must be callable.")
+
+        # 个数必须是整数；bool 虽然是 int 的子类，但不应该作为个数。
+        for name, value in (("popsize", popsize), ("max_nfev", max_nfev)):
+            if isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral):
+                raise TypeError(f"{name} must be an integer.")
+            if value <= 0:
+                raise ValueError(f"{name} must be positive.")
+        if max_nfev < popsize:
+            raise ValueError("max_nfev must be at least popsize.")
+
+        try:
+            bounds = np.array(bounds, dtype=float, copy=True)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "bounds must contain numeric (lower, upper) pairs."
+            ) from exc
+        if bounds.ndim != 2 or bounds.shape[0] == 0 or bounds.shape[1] != 2:
+            raise ValueError("bounds must have shape (dim, 2), with dim >= 1.")
+        if not np.all(np.isfinite(bounds)):
+            raise ValueError("bounds must contain only finite values.")
+        if np.any(bounds[:, 0] > bounds[:, 1]):
+            raise ValueError(
+                "Each lower bound must be less than or equal to its upper bound."
+            )
+
         self.func = func
-        self.bounds = np.array(bounds, dtype=float, copy=True)
-        self.popsize = popsize
-        self.max_nfev = max_nfev
+        self.bounds = bounds
+        self.popsize = int(popsize)
+        self.max_nfev = int(max_nfev)
         self.dim = len(self.bounds)
         self.nfev = 0
         self.rng = np.random.default_rng(seed)
 
     def iterate(self):
-       """生成器：初始化后，每完成一代就 yield 一个 GenerationInfo。"""
-       if self.nfev > 0:
-           raise RuntimeError("iterate() should be called before any evaluations.")
-       if self.max_nfev < self.popsize:
-           raise ValueError("max_nfev must be at least popsize.")
-       lower, upper = self.bounds[:, 0], self.bounds[:, 1]
-       self.population = self.rng.uniform(lower, upper, size=(self.popsize, self.dim))
-       self.fitness = self.evaluate(self.population)
-       generation = 0
-       while True:
-           best_idx = np.argmin(self.fitness)
-           yield GenerationInfo(generation=generation, nfev=self.nfev, best_x=self.population[best_idx].copy(), best_f=self.fitness[best_idx], extra=self.extra_info())
-           if self.nfev + self.popsize > self.max_nfev:
-               break
-           self.step()
-           generation += 1
-       
+        """生成器：初始化后，每完成一代就 yield 一个 GenerationInfo。"""
+        if self.nfev > 0:
+            raise RuntimeError("iterate() should be called before any evaluations.")
+        lower, upper = self.bounds[:, 0], self.bounds[:, 1]
+        self.population = self.rng.uniform(lower, upper, size=(self.popsize, self.dim))
+        self.fitness = self.evaluate(self.population)
+        generation = 0
+        while True:
+            best_idx = np.argmin(self.fitness)
+            yield GenerationInfo(
+                generation=generation,
+                nfev=self.nfev,
+                best_x=self.population[best_idx].copy(),
+                best_f=self.fitness[best_idx],
+                extra=self.extra_info(),
+            )
+            if self.nfev + self.popsize > self.max_nfev:
+                break
+            self.step()
+            generation += 1
+
     def run(self):
         """跑到停止条件为止，返回最终结果。内部调用 iterate()。"""
         last_info = None
@@ -62,18 +97,17 @@ class Optimizer(ABC):
         self.fitness[success] = trial_fitness[success]
         self.adapt(success, F, CR, improvement)
 
-
     def evaluate(self, X):
         if self.nfev + len(X) > self.max_nfev:
-            raise RuntimeError("Maximum number of function evaluations exceeded.")
+            raise ValueError("Maximum number of function evaluations exceeded.")
         self.nfev += len(X)
         return np.array([self.func(x) for x in X], dtype=float)
 
     def repair(self, mutants, targets):
         """越界处理，默认用 JADE 里的“和边界取中点”。"""
         lower, upper = self.bounds[:, 0], self.bounds[:, 1]
-        repaired = np.where(mutants < lower, (mutants + targets) / 2, mutants)
-        repaired = np.where(repaired > upper, (repaired + targets) / 2, repaired)
+        repaired = np.where(mutants < lower, (targets + lower) / 2, mutants)
+        repaired = np.where(mutants > upper, (targets + upper) / 2, repaired)
         return repaired
 
     def crossover(self, targets, mutants, CR):
@@ -86,8 +120,7 @@ class Optimizer(ABC):
         trials = np.where(mask, mutants, targets)
         return trials
 
-
-     # ---------- 子类必须 / 可以重写的钩子 ----------
+    # ---------- 子类必须 / 可以重写的钩子 ----------
     @abstractmethod
     def generate_params(self):
         """返回 F 和 CR，各是长度为 popsize 的数组。"""
