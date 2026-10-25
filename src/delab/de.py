@@ -3,6 +3,7 @@ from numbers import Real
 import numpy as np
 
 from .base import Optimizer
+from .strategies import rand_1
 
 
 class DE(Optimizer):
@@ -33,11 +34,4 @@ class DE(Optimizer):
 
     def mutate(self, F):
         """返回变异向量矩阵，形状 (popsize, dim)。"""
-        idxs = np.arange(self.popsize)
-        mutants = np.empty_like(self.population)
-        for i in range(self.popsize):
-            a, b, c = self.rng.choice(idxs[idxs != i], size=3, replace=False)
-            mutants[i] = self.population[a] + F[i] * (
-                self.population[b] - self.population[c]
-            )
-        return mutants
+        return rand_1(self.population, F, self.rng)

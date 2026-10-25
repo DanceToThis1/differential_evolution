@@ -48,6 +48,23 @@ print(result.best_x, result.best_f, result.nfev)
 `for info in optimizer.iterate(): ...`；它也会产出初始化后的第 0 代。
 每次重新运行实验应创建新的优化器实例，同一个实例只能启动一次运行。
 
+## 变异策略
+
+`src/delab/strategies.py` 保存独立的变异函数，目前提供 `rand_1(pop, F, rng)`。
+`pop` 是形状为 `(n, dim)` 的 NumPy 数值数组，`F` 是长度为 `n` 的数组，
+`rng` 是随机数生成器。调用者需要保证 `n >= 4`；通过 DE/jDE 调用时，构造函数会检查。
+
+该函数为每个个体从其他个体中不放回抽取三个索引，计算
+`pop[a] + F[i] * (pop[b] - pop[c])`，返回新数组，不修改种群和参数。
+随机数生成器的状态会推进；函数只负责变异，越界修复和交叉仍由优化器完成。
+
+`DE.mutate()` 把实例中的种群、参数和随机数生成器交给 `rand_1()`。
+jDE 继承这个方法，因此也使用同一份策略实现。策略可以直接导入，无需构造优化器：
+
+```python
+from delab.strategies import rand_1
+```
+
 ## jDE：每个个体保存自己的参数
 
 ```python
@@ -103,7 +120,7 @@ python -m ruff format --check .
 ```
 
 pytest 从 `tests/` 收集测试。现有测试覆盖 Sphere 收敛、seed 可复现、越界修复、
-评估点合法性、构造参数检查、评估预算以及 jDE 的候选参数和成功保留规则。
+评估点合法性、构造参数检查、评估预算、独立变异策略以及 jDE 的候选参数和成功保留规则。
 只运行参数检查测试：
 
 ```bash
