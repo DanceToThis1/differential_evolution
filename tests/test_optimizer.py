@@ -12,6 +12,7 @@ def test_de_converges_on_sphere():
         func=sphere, bounds=[(-5, 5), (-5, 5)], popsize=30, max_nfev=5000, seed=42
     )
     result = optimizer.run()
+    assert result is not None
     assert 0 <= sphere(result.best_x) < 1e-6
     np.testing.assert_allclose(result.best_f, sphere(result.best_x), rtol=0, atol=1e-12)
     assert optimizer.nfev <= 5000

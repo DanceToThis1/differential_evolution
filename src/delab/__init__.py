@@ -3,5 +3,7 @@
 from .base import GenerationInfo, Optimizer
 from .de import DE
 from .jde import JDE
+from .jade import JADE
+from .archive import Archive
 
-__all__ = ["DE", "JDE", "GenerationInfo", "Optimizer"]
+__all__ = ["JADE", "DE", "JDE", "GenerationInfo", "Optimizer", "Archive"]

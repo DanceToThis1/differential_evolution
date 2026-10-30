@@ -109,7 +109,8 @@ def test_jde_converges_and_reproduces_results_with_same_seed():
         JDE(sphere, [(-5, 5)] * 2, popsize=30, max_nfev=5000, seed=42) for _ in range(2)
     ]
     first, second = [optimizer.run() for optimizer in optimizers]
-
+    assert first is not None
+    assert second is not None
     assert first.best_f < 1e-6
     np.testing.assert_allclose(first.best_f, sphere(first.best_x), rtol=0, atol=1e-12)
     np.testing.assert_array_equal(first.best_x, second.best_x)

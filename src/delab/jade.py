@@ -1,5 +1,6 @@
 import numpy as np
-from .base import Optimizer, Archive
+from .base import Optimizer
+from .archive import Archive
 from .strategies import current_to_pbest_1
 
 class JADE(Optimizer):
@@ -16,6 +17,8 @@ class JADE(Optimizer):
         super().__init__(
             func=func, bounds=bounds, popsize=popsize, max_nfev=max_nfev, seed=seed
         )
+        if self.popsize < 3:
+            raise ValueError("popsize must be at least 3 for JADE.")
         if not 0 < p <= 1:
             raise ValueError("p must be in (0, 1].")
         if not 0 < c <= 1:
